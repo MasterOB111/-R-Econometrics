@@ -1,0 +1,106 @@
+---
+title: "Assignment 3 Econ320"
+author: "D.Z."
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+#Chunk setup
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=50),tidy=TRUE)
+
+# Call or load your packages here
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(stargazer)
+library(kableExtra)
+library(foreign)
+library(wooldridge)
+library(car)
+```
+
+# Multicolinearity detection and output presentation
+
+Using the data gpa1 from the wooldridge package create two new variables in the gpa1 data set  
+
+$$x = 3+ ACT*2$$
+```{r echo = TRUE}
+data(gpa1, package = "wooldridge")
+x <- 3 + gpa1$ACT*2
+```
+
+
+$$z=ACT+2*hsGPA$$
+```{r echo = TRUE}
+z <- gpa1$ACT + 2*(gpa1$hsGPA)
+```
+
+
+Create a correlation matrix of colGPA, hsGPA, ACT, x, z, and a correlation matrix graph
+
+This graph is not my favorite graph, it is too busy, but it will do the trick for now. 
+What can you say about the correlation matrix and the graphs? 
+Note: Extra points if you do another cooler graph!!!Like corrplot or chart.Correlation.
+
+```{r echo = TRUE}
+dta1 <- gpa1 %>% select(colGPA, hsGPA, ACT)
+dta1$x <- (dta1$ACT)*2 + 3
+dta1$z <- (dta1$ACT) + 2*(dta1$hsGPA)
+cor1 <- cor(dta1)
+round(cor1, 3)
+cor1mtx <- pairs(~ colGPA + hsGPA + ACT + x + z, data = dta1,
+   main="Simple Scatterplot Matrix")
+```
+
+Run the following six regressions, and show them al, toguether in a nice looking table  
+
+$$colGPA=\beta_0 + \beta_1hsGPA + \beta_2ACT + u $$
+$$colGPA=\beta_0 + \beta_1hsGPA + \beta_2ACT + + \beta_3x + + \beta_4z + u $$
+
+Make a summary of the second regression, look at it. 
+Then make sure that the output of the code for it doesn't show, this is just for you to see how R reacts to the multicolinearity problem. EXPLAIN what happened in the output and why.  
+```{r echo = TRUE}
+lm1 <- lm(formula = colGPA ~ hsGPA + ACT, data = dta1)
+lm2 <- lm(formula = colGPA ~ hsGPA + ACT + x + z, data = dta1)
+# In the summary of the second regression, the coefficients of x and z are not available in the summary. This is due to the fact that x and z can be derived from other variables in the regression function. R omits the coefficients of these variables, and regard them as "excessive information".
+```
+```{r echo = TRUE, results = 'asis'}
+stargazer(lm1, lm2, title = "Determinants of College GPA", dep.var.caption = "College GPA", dep.var.labels = "Previous Academics", column.labels = c("Basic Model", "Model with multicolinearity"), covariate.labels = c("High SchoolGPA", "ACT", "x", "z"), type = 'html')
+```
+
+
+
+
+Show the results for your regressions using the stargazaer package
+
+# Prove some OLS properties 
+
+Use R to 
+
+* evaluate the vif of model1 and model2. See what happens to model2, comment, and fix the code to be able to knit
+```{r echo = TRUE}
+vif(lm1)
+# The reason we can't do vif(lm2) is due to the fact that x and z in lm2 can be derived through hsGPA and ACT, thus we run into the error code of "... there are aliased coefficients in this model."
+```
+
+
+* demonstrate that the residuals of model1 add up to zero. What does that mean? EXPLAIN 
+```{r echo = TRUE}
+u=resid(lm1)
+round(sum(u),2)
+#This means that our model generates the "line of best fit".
+```
+
+* demonstrate the $R^2$ of a regression of the residuals of model1 on the original regressors must be zero. What does this mean? EXPLAIN
+```{r echo = TRUE}
+round(cor(u, lm1$model$hsGPA), 3)
+round(cor(u, lm1$model$ACT), 3)
+# This imply that there is no component in residuals of model 1 that haven't been explained by our regressors.
+```
+
+
+
