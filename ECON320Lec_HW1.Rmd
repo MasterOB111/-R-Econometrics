@@ -1,0 +1,110 @@
+---
+title: "ECON 320 Homework 1"
+author: "D.Z."
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: 
+  html_document: 
+    toc: true
+    toc_depth: 4
+    theme: readable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+Part 1
+
+```{r echo = TRUE}
+# Importing data into R
+X <- c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+Y <- c(5, 7, 8, 8, 10, 12, 11, 15, 19, 18)
+J <- c(7, 7, 7, 8, 8, 7, 8, 8, 7, 6, 9, 9, 8, 9, 7, 8, 9, 6, 10, 10, 9)
+K <- c(18, 16, 15, 16, 10, 11, 11, 9, 11, 19, 8, 8, 6, 4, 9, 10, 7, 15, 10, 7, 5)
+
+```
+
+- Upon visual inspection, X will have greater variance than J, due to X's generally greater numeral difference within sample. 
+
+```{r echo = TRUE}
+(varX <- sum((X - mean(X)) ^2 ) / 9)
+
+(varY <- sum((Y - mean(Y)) ^ 2) / 9)
+
+(covXY <- sum((X - mean(X)) * (Y - mean(Y))) / 9)
+
+(varJ <- sum((J - mean(J)) ^ 2) / 20)
+
+(varK <- sum((K - mean(K)) ^ 2) / 20)
+
+(covJK <- sum((J - mean(J)) * (K - mean(K))) / 20)
+
+```
+
+```{r}
+# Scatterplot for X and Y
+XY <- data.frame(X, Y)
+ggplot(XY, aes(x = X, y = Y)) +
+  geom_point()
+```
+
+```{r}
+# Scatterplot for J and K
+JK <- data.frame(J, K)
+ggplot(JK, aes(x = J, y = K)) +
+  geom_point()
+```
+
+Part 2
+
+Answer: 
+- This forluma resembles the Cobb-Douglas Production Function. 
+
+- The value of alpha and beta affect the change in final output Y by affecting changes in K^alpha and L^beta, respectively. 
+
+- In Cobb-Douglas Production Function, the value of the sum of ?? and ?? reveals the returns to scale. 
+  - If alpha + beta = 1, There is a positive return to scale. 
+  - If alpha + beta > 1, there is a increasing return to scale. 
+  - If alpha + beta < 1, there is a decreasing return to scale.
+
+- A is a constant. It is the technology coefficient that measures the efficiency.
+
+
+
+---- Take log of the function to make it linear
+----- A is either constant or residual
+
+Part 3
+
+1. How education affects wages
+
+- Here, we can set X as years of education received, and Y as income per year, the unit is each individual.
+
+- X should be measured in year, and Y should be measured in U.S. dollar (For X, instead of one year, we can take 5 years as a segment. This is because a great deal of people are able to obtain high school degrees with public education, which generally require over 10 years of education. The segment of years can also be altered in order to accomodate our samples).
+
+- I expect more years spent in education will result in higher income. Based on reality, years of education and income usually form a positive correlation. Many high-paying jobs requires high-level education. At the same time, higher education generally leads to more opportunities in the job market, thus boosting the probability of getting jobs with higher income.
+
+2. Whether smaller class sizes improve learning outcomes
+
+- Here, we can set X as the size of class, and Y as average score of standardized test in a class.
+
+- X should be measured in number of students, and Y should be measured in the numeric value of score.
+
+- I expect that the smaller the class, the higher average score the class will have. Since under most circumstances, there will only be one instructor per course, smaller class size leads to more interactions between students and instructors. With more time spent with instructors, students are able to ask more questions. For students, more question answered generally leads to better performance in tests. 
+
+3. How effective incentives are in encouraging people to get their HIV test results:
+
+- Here, we can set X as the amount incentives offered, such as Malawian Kwancha, and Y as the percentage of sample that participate the HIV test due to the incentive (Sampling is very crucial in this case, since some people might have already scheduled HIV test before incentive are offered. We can solve this by asking a question such as "Are you going to take a HIV test in the following month?" before we offer the incentives. If the answer is yes, then we will simply not include this person into our sample).
+
+- X should be measured in Malawian Kwacha (we can set the range from 5 - 500 Kwacha), and Y should be measured in the percentage of sample that take the HIV test in the following month after incentives are offered.
+
+- I expect that the higher amount of incentives are offered, the more likely people will participate in the test. If I were the person offered with the incentives, I will only take the test if the amount of money and the merit of HIV test will compensate my time cost lost in hospital. Each person has a different threshold of incentives offered to compensate for their time cost. The higher the monetary value of the incentives, the higher percentage of people's thresholds will be reached. In this way, higher percentage of people in the sample will go take the HIV test due to incentives.
+
+4. Whether we can detect discrimination based on the sound of an applicant's name
+
+- Here, we can set X as the ethnicity of names, and Y as the percentage of people in certain ethnicity that are offered with interviews (To achieve Ceteris Paribus, individuals in our sample should all be citizens or permanent residents of a country that our study take place in, which guarantees they are all legal to work without the influence of citizenships).
+
+- X should be categorical, because it represent various ethnicities. Y should be measured in numeric value of percentage. (In other words, the graph for this study would be a bar chart with X-axis representing various ethnicities and Y-axis representing percentage of interviews received)
+
+- I expect that names which reveal Anglo-Saxon characteristics are more likely to receive interview opportunities than names that reveal other ethnicities. The current racial discriminations are in favor of the white community. Therefore, individuals with "white names" are expected to have more opportunities than people with "minority names".
