@@ -1,0 +1,77 @@
+---
+title: "Assignment 4"
+author: "D.Z."
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(wooldridge)
+library(tidyverse)
+library(stargazer)
+library(data.table)
+library(car)
+library(knitr)
+```
+
+## Regressions with Qualitative Information 
+
+1. Using the data wage2 from the wooldridge package. Estimate the models: m1, m2, m3, m4 
+
+Model 1 $$log(wage) = \beta_0 + \beta_1 educ + \beta_2 exper + \beta_3tenure + \beta_4 married + u $$
+Model 2  $$log(wage) = \beta_0 + \beta_1 educ + \beta_2 exper + \beta_3tenure + \beta_4 married + \beta_5 black + u $$
+Model 3  $$log(wage) = \beta_0 + \beta_1 educ + \beta_2 exper + \beta_3tenure + \beta_4 married + \beta_5 black + \beta_6 south + u $$ 
+Model 4  $$log(wage) = \beta_0 + \beta_1 educ + \beta_2 exper + \beta_3tenure + \beta_4 married + \beta_5 black + \beta_6 south + \beta_7 urban + u$$ 
+
+```{r echo = TRUE}
+data(wage2, package = "wooldridge")
+m1 <- lm(formula = log(wage) ~ educ + exper + tenure + married, data = wage2)
+m2 <- lm(formula = log(wage) ~ educ + exper + tenure + married + black, data = wage2)
+m3 <- lm(formula = log(wage) ~ educ + exper + tenure + married + black + south, data = wage2)
+m4 <- lm(formula = log(wage) ~ educ + exper + tenure + married + black + south + urban, data = wage2)
+```
+
+Report the results using a stargazer table. Holding other factors fixed what is the aproximate difference in monthly salary between blacks and non blacks, married vs single, urban vs rural?  Are these statistically significant? INTERPRET
+
+```{r echo = TRUE, results = "asis"}
+m4
+
+stargazer(m1, m2, m3, m4, dep.var.labels=c("Log(Salary)"), covariate.labels = c("Education", "Experience", "Tenure", "Married", "Black", "South", "Urban"), type = 'html', column.labels = c("Model 1", "Model 2", "Model 3", "Model 4"))
+
+```
+
+- The difference between blacks and non-blacks in terms of wage is -0.188 unit of Log(Salary). The difference between married and single is 0.199 unit of Log(Salary). The difference between urban and rural is 0.184 unit of Log(Salary). 
+
+- The t-value of Black is -4.95, which is even significant at level of 0.001, two tail test. Therefore it is statistically significant. The t-value of Married is 5.10, which is significant at level of 0.001, two tail test. Therefore it is statistically significant. The t-value of Urban is 6.81, which is significant at level of 0.001, two tail test. Therefore it is statistically significant.
+
+2. Using model 4 add the variables $exper^2$ and $tenure^2$ to the equation and show that they are jointly significant at 20% level
+```{r echo = TRUE}
+m5 <- m4 <- lm(formula = log(wage) ~ educ + exper + tenure + married + black + south + urban + I(exper^2) + I(tenure^2), data = wage2)
+linearHypothesis(m5, c("I(exper^2) = 0", "I(tenure^2) = 0"))
+```
+
+
+
+3. Using model 4 and add dummy variable for age groups less that or equal to 30, between 30 to 35, older than 35. Do a frequency table using `kable()` showing the distribution of each group.  Make older than 35 the reference group, run a regression, what can you say about the effect of age group on the wages? Put the results in a stargarzer table.
+```{r echo = TRUE, results = 'asis'}
+dummyCut <- wage2
+cutpts <- c(0, 30, 35, 38)
+dummyCut$ageCut <- cut(dummyCut$age, cutpts)
+dummyCut %>% select(ageCut) %>% group_by(ageCut) %>% summarise(Freq = n()) %>% setNames(., c("Age Group", "Freq")) %>% kable()
+dummyCut$ageCut <- relevel(dummyCut$ageCut, "(35,38]")
+dum <- lm(formula = log(wage) ~ educ + exper + tenure + married + black + south + urban + ageCut, data = dummyCut)
+stargazer(dum, covariate.labels = c("Education", "Experience", "Tenure", "Married", "Black", "South", "Urban", "Younger than 30", "Between 30-35"), type = 'html')
+```
+
+- By the coefficient of Younger than 30 and the coefficient of Between 30-35, we can see that when compared to people over 35, younger in age means lower in income. The reason behind that is because the coefficient on Younger than 30 is -0.080 and the coefficient on Between 30-35 is -0.039. The negative effect of younger age will decrease as workers become older. This is reasonable since older workers are likely to have more experience than younger workers, therefore older workers can be more productive when processing certain problems. Higher productivity means higher income.
+
+<br>
+4. Use model 4 but now allow wages to differ accross four groups of people, married and black, married and nonblack, single and black and single and non black. Put the results in a stargarzer table. (Hint: Think about how interactions work, what are all the categories in the interaction and what is the base category.) Do not create the interaction separate. Do it inside the `lm()` directly as learned in class. Interpret your results
+
+```{r echo = TRUE, results = 'asis'}
+dummyCut2 <- lm(formula =  log(wage)~ educ + exper + tenure + married*black + south + urban  , data = wage2)
+stargazer(dummyCut2, dep.var.labels=c("Log(Salary)"), type="html", order = c(1,2,3,4,5,8,6,7), covariate.labels = c("Education", "Experience", "Tenure", "Married-Non Black","Single-Black","Married-Black","South","Urban"))
+```
+
+- For married people, being black will have a negative effect in terms of income. The coefficient on Married-None Black is 0.189 and Married-Black is 0.061, 0.061 < 0.189. For Single people, being black will still pose a nagative on income. The coefficient on Single-Black is -0.241 and since Single-Non Black is our base case, its coefficient is zero. -0.241 < 0.
