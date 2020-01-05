@@ -1,0 +1,360 @@
+---
+title: "Eco320L Final Project"
+author: "D.Z."
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MASS)
+library(wooldridge)
+library(knitr)
+library(ggplot2)
+library(stargazer)
+library(kableExtra)
+library(foreign)
+library(dplyr)
+library(estimatr) 
+library(texreg) 
+library(tidyverse) 
+library(lmtest) 
+library(car)
+
+```
+
+```{r echo = TRUE}
+# Import dataset "affairs"
+data(affairs, package = "wooldridge")
+```
+
+# Introduction and Motivation
+
+My research goal is to discover possible factors that are realated to affairs in marriages. If affairs are discovered during marriages, it is very understandable that there will be separations and divorces. According to a report published on census.gov, *Number, Timing, and Duration of Marriages and Divorces* By Rose M. Kreider and Renee Ellis, the average marriage lenth of the first marriage is 8 years (Kreider and Ellis). According to CDC, The probability of a first marriage ending in separation or divorce in the first 5 years is 20% and in 10 years is 33% (CDC). People are getting divorces for various reasons, and discoveries of their partner's affairs is a very common one. 
+
+In the first glance of this issue, many people might have the inclination to believe that only people who are not satisfied with their relationships cheat. To be honest, my first intuition for people who have affairs are whom with unsatisfying relationships as well. On top of that, I suspect that people who cheat are probably not very religious. Autho R. Scott Gornto points out in his article *The 3 Main Reasons Why People Have Affairs* that "external validation" and addiction for "new encountes" lure people into cheating their partners (Gornto). 
+
+However, after more extensive research on the Internet, new information suggests my arbituary intuition toward this topic is not necessarily accurate. According to an interview with author Esther Perel, a psychotherapist, even people with satisfying relationships can end up cheating each other (Bonos). The reason behind this, according to Perel, is due to the lack of passion in marriages: even people who love their spouse account that they can't find "vitality" in their relationships (Bonos).
+
+# Data
+
+In order to verify these conflict views, I have to analyze the relationships between numbers of affairs and potentially correlated influences. The dataset **affairs** in Wooldridge package offers 601 observations and 19 variables. Each observation records an individual's ID, gender (M/F), age, length of marriage (year), number of kids, degree of religiousness (1 - 5), education level (year), occupation (reverse Hollingshead scale), marriage rating (1 - 5), and number of affairs.
+
+```{r echo = TRUE, results = "asis"}
+# Gives a summary of the structure of the dataframe "affairs"
+stargazer(affairs, type = "html")
+# 601 observations of 19 variables
+```
+
+Two factors in our data will be treated as non-numerical variables, which are religiousness and marriage ratings. Acording to the description of this dataset, these two ratings are based on very arbitrary scales. Therefore, regarding the "levels" as catagorical variables instead of numerical variables is more suitable.
+
+Let's look into the statistics of affairs count of people with different levels of religiousness and marriage ratings
+
+```{r echo = TRUE}
+# Average affairs per year under the scales of religiousness
+(relRate_avgAff <- affairs %>%
+  dplyr::select(relig, naffairs) %>%
+   group_by(relig) %>%
+   summarise(avgnaffairs = mean(naffairs)))
+
+# Create a box chart for demonstration
+ggplot(data = relRate_avgAff, aes(x = relig, y = avgnaffairs, fill = relig)) +
+  geom_col() +
+  ylab("Average Affairs") + xlab("Religiousness") + 
+  ggtitle("Average Affairs by Religiousness")
+```
+
+As we can see from the graph, there is an unexpected increase in average affairs of people who are slightly religious (3), compared to people that are not religious (2). Also, the average affairs of people who are very religious (5) is slightly higher than those that are somewhat religious (4). These two issues could potentially make religiousness statistically insignificant as we put religious factor into our model, but we will check its statistical significance as we proceed. Overall, the less religious people are in our sample, the more affairs they are likely to have.
+
+```{r echo = TRUE}
+# Average affairs per year under the scales of marriage ratings
+(marRate_avgAff <- affairs %>%
+  dplyr::select(ratemarr, naffairs) %>%
+  group_by(ratemarr) %>%
+  summarise(avgnaffairs = mean(naffairs)))
+
+# Create a box chart for demonstration
+ggplot(data = marRate_avgAff, aes(x = ratemarr, y = avgnaffairs, fill = ratemarr)) + 
+  geom_col() +
+  ylab("Average Affairs") + xlab("Marriage Ratings") + 
+  ggtitle("Average Affairs by Marriage Ratings")
+```
+
+Compared to religiousness, marriage ratings does give us a result that is more coherent to our intuition, which is lower marriage ratings will result in more affairs in average. However, there is still a small increase as marriage ratings goes from 1 to 2. We will check its statistical significance as well when we add marriage ratings to our model.
+
+Since our dataset contains gender information, I am going to treat $male$ as a dummy variable.
+
+```{r echo = TRUE}
+# Average affairs per year under the scales of ages
+(male_avgAff <- affairs %>%
+  dplyr::select(male, naffairs) %>%
+  group_by(male) %>%
+  summarise(avgnaffairs = mean(naffairs)))
+
+# Create a box chart for demonstration
+ggplot(data = male_avgAff, aes(x = male, y = avgnaffairs, fill = male)) + 
+  geom_col() +
+  ylab("Average Affairs") + xlab("Gender (female = 0, male = 1)") + 
+  ggtitle("Average Affairs by Gender")
+```
+
+As we can see here, the average affairs between male and female are very close. It may suggest that adding gender might not be statistically significant if I add it to regression models. I am going to add $male$ last, and then verify its statistical significance. 
+
+After examing religiousness and marriage ratings, let's move to age. My expectation of the relationships between ages and affairs might not be linear. One may suggest that as people ages, those who are married will learn to cherrish their marriages instead of "seeking adventures". However, as years passed, married people might find their life to be tedious as they have to live with their husbands / wives every single day, so they are more volitile to temptations.
+
+```{r echo = TRUE}
+# Average affairs per year under the scales of ages
+(age_avgAff <- affairs %>%
+  dplyr::select(age, naffairs) %>%
+  group_by(age) %>%
+  summarise(avgnaffairs = mean(naffairs)))
+
+# Create a box chart for demonstration
+ggplot(data = age_avgAff, aes(x = age, y = avgnaffairs, fill = age)) + 
+  geom_col() +
+  ylab("Average Affairs") + xlab("Age") + 
+  ggtitle("Average Affairs by Age")
+```
+
+The result is truely facinating. Even though I expect that the effect of age might be non-linear, the result shows that average cheartings goes up then down as people passes the age of 22. Younger people who married under 22 have averages of 4 affairs. Compaired to the second peak at around 42 years old, this is a very significant difference.
+
+As we have shown above, there is indeed a pattern in the relationships between time and affairs. To be prudent, here I am going to examine the relationships between years of marriage and affairs as well.
+
+```{r echo = TRUE}
+# Set up a dataframe for years of marriage and number of affairs per year
+(yrsmarr_avgAff <- affairs %>%
+  dplyr::select(yrsmarr, naffairs) %>%
+  group_by(yrsmarr) %>%
+  summarise(avgnaffairs = mean(naffairs)))
+
+# Create a box chart for demonstration
+ggplot(data = yrsmarr_avgAff, aes(x = yrsmarr, y = avgnaffairs, fill = yrsmarr)) + 
+  geom_col() +
+  ylab("Average Affairs") + xlab("Years of Marriage") + 
+  ggtitle("Average Affairs by Years of Marriage")
+```
+
+According to the data, the average affiars does goes up as years of marriage increase. One may argue that people with cheat more on average as their age increase. However, this increment might not be affected by age at all. If the probability of people cheating is constant, as time goes, the average affairs will still go up. In order to determine whether years of marriage should be put into the regression model, I will specifically examine its statistical significance as well.
+
+Having kids could be influential to people's intention of cheating. Once being discovered having affairs, having kids would put married people into deeper social and moral crisis. Even if geting caught of cheating doesn't result in divorces, the fact of parents' cheatings would still very likely to affect the kids. In this way, I suspect that compared to people with no kids, the average affairs of people with kids will be lower.
+
+```{r echo = TRUE}
+# Set up a dataframe for kids and affairs
+(kids_avgAff <- affairs %>%
+  dplyr::select(kids, naffairs) %>%
+  group_by(kids) %>%
+  summarise(avgnaffairs = mean(naffairs)))
+
+# Create a box chart for demonstration
+ggplot(data = kids_avgAff, aes(x = kids, y = avgnaffairs, fill = kids)) + 
+  geom_bar(stat="identity") +
+  ylab("Average Affairs") + xlab("Having kids or not") + 
+  ggtitle("Average Affairs by Having Kids or Not")
+```
+
+According to the result, people with kids actually cheat more on average. I assume this might because of the change of couple relationships after introducing kids into family lives. I will put kids as a catagorical variable into the model as a dummy variable (= 1 if have kids).
+
+Education level migth be related with affairs as well. But I do not have an expectation of the pattern for this. Higher level of education could result in higher level of dicipline. On the other hand, higher education level people are likely to have higher positions in their career, which could expose them to more temptations, resulting in higher chance of cheating.
+
+```{r echo = TRUE}
+# Set up a dataframe for educ and affiars
+(educ_avgAff <- affairs %>%
+  dplyr::select(educ, naffairs) %>%
+  group_by(educ) %>%
+  summarise(avgnaffairs = mean(naffairs)))
+
+# Create a box chart for demonstration
+ggplot(data = educ_avgAff, aes(x = educ, y = avgnaffairs, fill = educ)) + 
+  geom_col() +
+  ylab("Average Affairs") + xlab("Education (years)") + 
+  ggtitle("Average Affairs by Education Level")
+```
+
+The overall relationship between education and average affairs is negatively correlated. The crucial point here is that there is a noticeable jump in average affairs when education increase from 16 to 17. I am going to take this factor into consideration when we put education into our model. 
+
+As for the occupation, it is quantified in reverse Hollingshead scale. According to the website of the enhanced Nathan Kline Institute-Rockland Sample (NKI-RS), Hollingshed Four-Factor Index of Socioeconomics Status (SES-Child) measures parent's education in a scale of 7, and the higher the scale number, the higher grade of education has been accomplished. After intensive research, I am still uncertain about the "reverse" part in the description of occupation column in the dataset. Since the regular SES-Child is still in 7 levels, and each of them are determined by levels of education, To figure out the "reverse" in the description of *occup*, I need to compare the relationship between *occup* and average affairs.
+
+```{r echo = TRUE}
+# Set up a dataframe for occup and affiars
+(occup_avgAff <- affairs %>%
+  dplyr::select(occup, naffairs) %>%
+  group_by(occup) %>%
+  summarise(avgnaffairs = mean(naffairs)))
+
+# Create a box chart for demonstration
+ggplot(data = occup_avgAff, aes(x = occup, y = avgnaffairs, fill = occup)) + 
+  geom_col() +
+  ylab("Average Affairs") + xlab("Occupation (Reverse Hollingshead scale") + 
+  ggtitle("Average Affairs by Occupation")
+```
+
+As the graph shows, visually there is no pattern between *occup* and average affairs. Therefore, I am going to add this variable at last when building the regression model, and check its statistical significance as well as collinearity.
+
+# Methodology / Empirical Model
+
+Based on this dataset, I am going to set a basic linear model and keep adding variables. When new variables are added, I am going to check its statistical siginificance as well as heteroskedasticity. 
+
+Due to the inconsistent of age (average affairs for people under 22 years old is very high), I will omit the people under 22 years old in the data set before adding age into the data set.
+
+Adding Religiousness to the model:
+
+$$naffairs = \beta_0 +\beta_1 notrel + \beta_2 slghtrel + \beta_3 smerel + \beta_4 vryrel + u$$
+Next, let's add marriage ratings:
+
+$$naffairs = \beta_0 +\beta_1 notrel + \beta_2 slghtrel + \beta_3 smerel + \beta_4 vryrel + \beta_5 unhap + \beta_6 avgmarr + \beta_7 hapavg + \beta_8 vryhap+ u$$
+
+To proceed, take kids into consideration:
+
+$$naffairs = \beta_0 +\beta_1 notrel + \beta_2 slghtrel + \beta_3 smerel + \beta_4 vryrel + \beta_5 unhap + \beta_6 avgmarr + \beta_7 hapavg + \beta_8 vryhap + beta_9 kids+ u$$
+
+Then, add age into the model:
+
+$$naffairs = \beta_0 +\beta_1 notrel + \beta_2 slghtrel + \beta_3 smerel + \beta_4 vryrel + \beta_5 unhap + \beta_6 avgmarr + \beta_7 hapavg + \beta_8 vryhap + \beta_9 kids + \beta_{10} age+ u$$
+
+Finaly, take gender into consideration
+
+$$naffairs = \beta_0 +\beta_1 notrel + \beta_2 slghtrel + \beta_3 smerel + \beta_4 vryrel + \beta_5 unhap + \beta_6 avgmarr + \beta_7 hapavg + \beta_8 vryhap + \beta_9 kids + \beta_{10} age+ \beta_{11} male+ u$$
+
+# Results
+
+```{r echo = TRUE}
+# exclude people that are under 22 based on the abnormality high of average affairs in this age group
+affairs_redu <- affairs %>% filter(age >= 22)
+# adding a new column of age squared for easier generating of regression model and f test
+affairs_redu <- mutate(affairs_redu, age_sqr = (age)^2)
+# regression models
+reg_1 <- lm(formula = naffairs ~ notrel + slghtrel + smerel + vryrel, data = affairs_redu)
+reg_2 <- lm(formula = naffairs ~ notrel + slghtrel + smerel + vryrel + unhap + avgmarr + hapavg + vryhap, data = affairs_redu)
+reg_3 <- lm(formula = naffairs ~ notrel + slghtrel + smerel + vryrel + unhap + avgmarr + hapavg + vryhap + kids, data = affairs_redu)
+reg_4 <- lm(formula = naffairs ~ notrel + slghtrel + smerel + vryrel + unhap + avgmarr + hapavg + vryhap + kids + age_sqr, data = affairs_redu)
+reg_5 <- lm(formula = naffairs ~ notrel + slghtrel + smerel + vryrel + unhap + avgmarr + hapavg + vryhap + kids + age_sqr + yrsmarr, data = affairs_redu)
+reg_6 <- lm(formula = naffairs ~ notrel + slghtrel + smerel + vryrel + unhap + avgmarr + hapavg + vryhap + kids + age_sqr + yrsmarr + male, data = affairs_redu)
+```
+
+## Regression Results
+```{r echo = TRUE, results = "asis"}
+# generate table using stargazer for regression models
+stargazer(reg_1, reg_2, reg_3, reg_4, reg_5, reg_6, type = "html")
+```
+
+## Regression discussion and analysis
+
+I set up five regression models here to examine the effect of religiousness, marriage ratings, having kids or not, age (due to the "upward" visual trend demonstrated in Data section), and gender. The reason I did not include occupation is due to two reasons. Firstly, even though I am able to acquire information online about Hollingshed Index, and the standard of the index is also in scale seven, which is the same magnitude in terms of scale compared to our data. However, I am not absolutely sure that whether the "reverse" in the description of the data only carries literal meaning. If $occup$ is measured in a completely different scale that is not related with Hollingshed Index, I am not able to interpret the result of data analysis if I put $occup$ in to the model. More importantly, $occup$ does not show any visual trend when paried with $affair$, compared to other variables that demonstrate clear patterns demonstrated by paring other variables with $affair$.
+
+The first regression shows that religiousness and the amount affairs are overall negatively related. Just like what I have discovered in the Data section, the absolute value of coefficient for slightly religious ($slghtrel$) is less than not religious ($notrel$). This indicates that people who are slightly religious are more prone to the temptation of cheating compared to those who are not religious. The absolute value of coefficient for somewhat religious ($smerel$) is more than that of very religious ($vryrel$), which is not what I expected either. In the fourth and fifth model, the coefficient of $smerel$ goes down and become smaller than that of $vryel$. As for marriage ratings, as ratings goes higher, the absolute value of their coefficients goes higher, just like what I demonstrate in the data section. As for $kids$, having kids does contribute to affairs positively, and the variable has a positive coefficient. As for the last two variables, age and yrsmarr looks they might not be statistically significant, as their t-value can be relatively small on 95% significance by visual inspection of their coefficients and SEs.
+
+Let's move on to inference section to check the statistical significance of variables.
+
+## Inference
+
+### T tests
+
+```{r echo = TRUE, results = "asis"}
+# t statistics for the first model 
+stargazer(summary(reg_1)[["coefficients"]][, "t value"], type = "html", title = "T-Values for First Regression model")
+```
+
+```{r echo = TRUE, results = "asis"}
+# t statistics for the second model 
+stargazer(summary(reg_2)[["coefficients"]][, "t value"], type = "html", title = "T-Values for Second Regression model")
+```
+
+```{r echo = TRUE, results = "asis"}
+# t statistics for the third model 
+stargazer(summary(reg_3)[["coefficients"]][, "t value"], type = "html", title = "T-Values for Third Regression model")
+```
+
+```{r echo = TRUE, results = "asis"}
+# t statistics for the forth model 
+stargazer(summary(reg_4)[["coefficients"]][, "t value"], type = "html", title = "T-Values for Forth Regression model")
+```
+
+```{r echo = TRUE, results = "asis"}
+# t statistics for the fifth model 
+stargazer(summary(reg_5)[["coefficients"]][, "t value"], type = "html", title = "T-Values for Fifth Regression model")
+```
+
+```{r echo = TRUE, results = "asis"}
+# t statistics for the sixth model 
+stargazer(summary(reg_6)[["coefficients"]][, "t value"], type = "html", title = "T-Values for Sixth Regression model")
+```
+
+
+```{r echo = TRUE, results = "asis"}
+# p value for the first model
+stargazer(summary(reg_1)[["coefficients"]][, "Pr(>|t|)"], 
+    type = "html", title = "First Regression Model, Pr(>|t|)")
+```
+
+```{r echo = TRUE, results = "asis"}
+# p value for the second model
+stargazer(summary(reg_2)[["coefficients"]][, "Pr(>|t|)"], 
+    type = "html", title = "Second Regression Model, Pr(>|t|)")
+```
+
+```{r echo = TRUE, results = "asis"}
+# p value for the third model
+stargazer(summary(reg_3)[["coefficients"]][, "Pr(>|t|)"], 
+    type = "html", title = "Third Regression Model, Pr(>|t|)")
+```
+
+```{r echo = TRUE, results = "asis"}
+# p value for the forth model
+stargazer(summary(reg_4)[["coefficients"]][, "Pr(>|t|)"], 
+    type = "html", title = "Forth Regression Model, Pr(>|t|)")
+```
+
+```{r echo = TRUE, results = "asis"}
+# p value for the fifth model
+stargazer(summary(reg_5)[["coefficients"]][, "Pr(>|t|)"], 
+    type = "html", title = "Fifth Regression Model, Pr(>|t|)")
+```
+
+```{r echo = TRUE, results = "asis"}
+# p value for the sixth model
+stargazer(summary(reg_6)[["coefficients"]][, "Pr(>|t|)"], 
+    type = "html", title = "Sixth Regression Model, Pr(>|t|)")
+```
+
+
+Regression model 1: all varaibels are statistically significant at 95% level, except $slghtrel$.
+
+Regression model 2: all varaibels are statistically significant at 95% level, except $slghtrel$ and $unhap$.
+
+Regression model 2: all varaibels are statistically significant at 95% level, except $slghtrel$, $unhap$, and $kids$.
+
+Regression model 4: all varaibels are statistically significant at 95% level, except $slghtrel$, $unhap$, $kids$ and $agesqr$.
+
+Regression model 5: all varaibels are statistically significant at 95% level, except $slghtrel$, $unhap$, and $kids$. $agesqr$ becomes statistically significant when $yrsmarr$ is added to the model. I will run a F-test to test the combined statistical significance of $agesqr$ and $yrsmarr$, so that I can be certain about whether should I include these two variables together in our model.
+
+Regression model 6: all varaibels are statistically significant at 95% level, except $slghtrel$, $unhap$, $kids$, and $male$.
+
+### F tests
+
+```{r echo = TRUE}
+myH0 <- c("age_sqr", "yrsmarr")
+linearHypothesis(reg_6, myH0)
+```
+
+Since F statistic is 13.111 and P value is almost zero, we can reject the null that age squared and years married are jointly equal to zero. These two variables are jointly statistically significant.
+
+# Conclusion
+
+Before setting up my regression model, I decided to test every column in my dataset for their relationship with *affair* beside itself. The purpose of doing so is to get a comprehensive understanding of the relationship of each columns when paired with the dependent variable *affair*. After examing all the potential independent variables for regression models, I set up five regression model, and add one variable (or one set of catagorical variable) as I proceed. My regression model indicates that having a strong faith or having a satisfactoring marriage can drastically reduce the expected count of affairs. 
+
+Just like my sixth model demonstrates, the effect of being very religious or having a satisfying marriage can reduce the average times of cheating by over 2 times, holding other factors constant. In comparison, people that are religious will have around 0.787 less affairs compare to people that are not very religious, holding other factors constant. More over, people that are very satisfied with their marriages will have around 0.786 less affairs compared to people with average happiness regarding their marriages. Age of people contributes little, as people gets one years older have 0.001 less affairs, holdign all else constant. As for years of marriages, our model indicates that with one more year of marriage, people will be expected to have 0.189 more affairs, holding all else constant. Numerically speaking, it is not a very large increament for one year. But if we consider this expected 0.189 increment of affairs per year in real life, people's affiars count will go up by 1 every 5.29 years of marriage.
+
+As for future improvements, I would like to have shave down my model by swap out a few variables with smaller t-values to make space for more potential variables. Cheating in marriages is a complicated issue, and I believe that there are more issues that can contribute to it. For example, spending less time with one's partner could induce more affairs, partner's alcohol / drug usage coudl contribute to partners' affairs, etc.. With more data and more independent variables added into consideration and delete some of the old ones that contributes to dependent variables less, the overall quality of regression models will improve.
+
+# Work cited
+
+(1) Dataset "affairs" from r package "Wooldridge"
+(2) *Number, Timing, and Duration of Marriages and Divorces: 2009, By Rose M. Kreider and Renee Ellis*
+https://www.census.gov/prod/2011pubs/p70-125.pdf
+(3) *New Report Sheds Light on Trends and Patterns in Marriage, Divorce, and Cohabitation*
+https://www.cdc.gov/nchs/pressroom/02news/div_mar_cohab.htm
+(4) *The 3 Main Reasons Why People Have Affairs*: https://www.psychologytoday.com/us/blog/the-stories-we-tell-ourselves/201512/the-3-main-reasons-why-people-have-affairs
+(5) *Why do people in good relationships cheat? Your infidelity questions answered.*: https://www.washingtonpost.com/news/soloish/wp/2017/10/17/why-do-people-in-good-relationships-cheat-esther-perel-answers-our-questions-on-infidelity/
+
