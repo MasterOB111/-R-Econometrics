@@ -1,0 +1,173 @@
+---
+title: "ECON320_Lec_HW4"
+author: "D.Z."
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(stargazer)
+library(kableExtra)
+library(foreign)
+```
+
+## Part 1
+
+1)
+
+  This model can't be used to obtain parameter estimates. The direct reason for this is that it violates MLR. 3. Since the total hours of the four activities must be 168, at least one of the four variables can be represeted as (168 - (the combination of the rest x)). In this way, one of the variables will be of perfect colinearity with the rest variables. 
+  
+  In order to make the model satisfies MLR. 3, we can drop one of the variables to eliminate the perfect colinearity in our current model. As we can set the omitted variables problem aside, when we drop one variable, we are still adhering to MLR. 1 to MLR . 5 as long as the total of the 3 variables we keep won't exceed 168 hours.
+
+2)
+
+![Part 1 (2)](/Users/dingyuanzhang/Documents/F19_Eco320L/320Lec/part1(2).png)
+
+3)
+
+![Part 1 (3)](/Users/dingyuanzhang/Documents/F19_Eco320L/320Lec/part1(3).jpeg)
+
+4)
+```{r echo = TRUE}
+# Unfinished
+card_returns <- read.dta("/Users/dingyuanzhang/Documents/F19_Eco320L/320Lec/Card_Returns.dta")
+spec5 <- lm(formula = log(wage) ~ educ + exper + expersq + married + black, data = card_returns)
+summary(spec5)
+```
+
+## Part 2
+
+5)
+
+```{r echo = TRUE}
+set.seed(12345)
+x1 <- rnorm(100000, 10, 10)
+u1 <- rnorm(100000, 0, 5)
+y1 = 2.5 + 1.5 * x1 + u1
+situation_1 <- data.frame(x1, u1, y1)
+beta_1_vector1 <- c()
+for(i in 1:1000) {
+  newPop1 <- situation_1[sample(nrow(situation_1), 1000), ]
+  beta_1_1 <- cov(newPop1$y1, newPop1$x1) / var(newPop1$x1)
+  beta_1_vector1 <- c(beta_1_vector1, beta_1_1)
+}
+
+x2 <- rnorm(100000, 10, 10)
+u2 <- rnorm(100000, 0, 50)
+y2 = 2.5 + 1.5 * x2 + u2
+situation_2 <- data.frame(x2, u2, y2)
+beta_1_vector2 <- c()
+for(i in 1:1000) {
+  newPop2 <- situation_2[sample(nrow(situation_2), 1000), ]
+  beta_1_2 <- cov(newPop2$y2, newPop2$x2) / var(newPop2$x2)
+  beta_1_vector2 <- c(beta_1_vector2, beta_1_2)
+}
+
+x3 <- rnorm(100000, 10, 10)
+u3 <- rnorm(100000, 0, 1)
+y3 = 2.5 + 1.5 * x3 + u3
+situation_3 <- data.frame(x3, u3, y3)
+beta_1_vector3 <- c()
+for(i in 1:1000) {
+  newPop3 <- situation_3[sample(nrow(situation_3), 1000), ]
+  beta_1_3 <- cov(newPop3$y3, newPop3$x3) / var(newPop3$x3)
+  beta_1_vector3 <- c(beta_1_vector3, beta_1_3)
+}
+
+ana_var1 <- var(u1) / (var(x1) * 999)
+emp_var1 <- var(beta_1_vector1)
+ana_var2 <- var(u2) / (var(x2) * 999)
+emp_var2 <- var(beta_1_vector2)
+ana_var3 <- var(u3) / (var(x3) * 999)
+emp_var3 <- var(beta_1_vector3)
+
+beta1_matrix <- matrix(c(ana_var1, emp_var1, ana_var2, emp_var2, ana_var3, emp_var3),ncol=2,byrow=TRUE)
+colnames(beta1_matrix) <- c("Analytical","Empirical")
+rownames(beta1_matrix) <- c("beta1_1","beta1_2","beta1_3")
+beta1_matrix <- as.table(beta1_matrix)
+beta1_matrix
+
+x4 <- rnorm(100000, 10, 10)
+u4 <- rnorm(100000, 0, 5)
+u4_cond <- u4*x4
+y4 = 2.5 + 1.5 * x4 + u4_cond
+situation_4 <- data.frame(x4, u4_cond, y4)
+beta_1_vector4 <- c()
+for(i in 1:1000) {
+  newPop4 <- situation_4[sample(nrow(situation_4), 1000), ]
+  beta_1_4 <- cov(newPop4$y4, newPop4$x4) / var(newPop4$x4)
+  beta_1_vector4 <- c(beta_1_vector4, beta_1_4)
+}
+
+ana_var4 <- var(u4_cond) / (var(x4) * 999)
+emp_var4 <- var(beta_1_vector4)
+
+beta1_matrix2 <- matrix(c(ana_var1, emp_var1, ana_var4, emp_var4),ncol=2,byrow=TRUE)
+colnames(beta1_matrix2) <- c("Analytical","Empirical")
+rownames(beta1_matrix2) <- c("beta1_1","beta1_1_cond")
+beta1_matrix2 <- as.table(beta1_matrix2)
+beta1_matrix2
+```
+
+# Part 3
+
+6)
+
+a. 
+```{r echo = TRUE, results = "asis"}
+maimonides <- read.dta("/Users/dingyuanzhang/Documents/F19_Eco320L/320Lec/AngristLavy_Maimonides.dta")
+fourth_grade <- maimonides %>% filter(grade == 4)
+reading_1 <- lm(formula = avgverb ~ classize, data = fourth_grade)
+reading_2 <- lm(formula = avgverb ~ classize + tipuach, data = fourth_grade)
+reading_3 <- lm(formula = avgverb ~ classize + tipuach + c_size, data = fourth_grade)
+math_1 <- lm(formula = avgmath ~ classize, data = fourth_grade)
+math_2 <- lm(formula = avgmath ~ classize + tipuach, data = fourth_grade)
+math_3 <- lm(formula = avgmath ~ classize + tipuach + c_size, data = fourth_grade)
+stargazer(reading_1, reading_2, reading_3, math_1, math_2, math_3, title = "Table 2", align = TRUE, covariate.labels = c("Mean score", "Class size", "Percent disadvantaged", "Enrollment"), type = "html")
+```
+
+---------------------
+
+For column 7 & 9:
+
+column 7: When class size increase by 1 unit, avgverb will rise up by 0.135 unit.
+
+column 9: When class size increase by 1 unit, avgverb will drop by 0.042 unit, holding others constant.
+
+The reason for the coefficient on class size differ from that in column 7 and column 9 is due to including variables percentage disadvantaged and enrollment. When we include new variables in our model, if the new variables have no correlation with the exsisting variables, the coefficients of the existing variables won't change. However, in our case, the coefficient of class size change drastically from a positive value 0.135 to a negative value -0.142. Therefore, variables percent disadvantaged and enrollment contain information regarding class size, and thus the coefficient of class size changes.
+
+For column 10 & 12
+
+column 10: When class size increase by 1 unit, avgmath will rise up by 0.211 unit.
+
+column 12: When class size increase by 1 unit, avgmath will rise up  by 0.003 unit, holding others constant.
+
+Similar to the case of column 7 & 9, the coefficient of variable class size changed when variables percent disadvantaged and enrollment are introduced. Even though the change here does not make the positive value of coefficient for class size in column 12 turn to negative value, there is still a significant decrease. Therefore, variables percent disadvantaged and enrollment contain information regarding class size, and thus the coefficient of class size changes.
+
+e.
+```{r echo = TRUE}
+math_3
+reg_beta_1 <- lm(formula = classize ~ tipuach + c_size, data = fourth_grade)
+u_beta_1 <- resid(reg_beta_1)
+(reg_beta_1_2 <- lm((formula = avgmath ~ u_beta_1), data = fourth_grade))
+```
+As the coefficients shows, percent disadvantaged and enrollment are indeed correlated with class size.
+
+f.
+```{r echo = TRUE}
+ggplot(data = fourth_grade, aes(x = classize, y = avgmath)) +
+  geom_point(color = "red") +
+  stat_function(fun = function(x){coef(math_1)[1] + coef(math_1)[2] * x}, geom = "line", color = "blue") +
+  ggtitle("Scatterplot 1")
+
+ggplot(data = fourth_grade, aes(x = classize, y = avgmath)) +
+  geom_point(color = "red") +
+  stat_function(fun = function(x){coef(math_1)[1] + coef(math_1)[2] * x}, geom = "line", color = "blue") +
+  stat_function(fun = function(x){coef(reg_beta_1_2)[1] + coef(reg_beta_1_2)[2]*x}, geom = "line", col = "green") +
+  ggtitle("Scatterplot 2")
+```
+
