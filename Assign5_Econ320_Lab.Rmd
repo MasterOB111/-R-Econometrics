@@ -1,0 +1,201 @@
+---
+title: "Assignment Econ 320 Inference Exercises"
+author: "D.Z."
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(estimatr) # for robust estimation
+library(wooldridge) # for wooldridge data
+library(stargazer) # for tables 
+library(texreg) # for tables using lm_robust
+library(tidyverse) # for data manipulation
+library(lmtest) # for BP test for heterosckedasticity
+library(car) # for linear hypothesis test
+```
+
+## Wooldridge C4.11 (Modified) 
+
+
+Use the data in HTV to answer this question. 
+
+1. Estimate the regression model
+
+$$ educ = \beta_0 + \beta_1 *motheduc + \beta_2 *fatheduc + \beta_3 *abil + \beta_4 *abil^2 + u$$
+by OLS take a look at the results in the usual form but report the results using stargazer. 
+
+2.a Test the null hypothesis that educ is linearly related to abil against the alternative that the relationship is quadratic. Show the tstat and the pvalue associated with that test. Do you reject the null hypothesis? what does that mean? EXPLAIN
+
+2.b Test the null hypothesis that the effect of mothereduc is bigger 0.3. 
+
+```{r echo = TRUE, message=FALSE, results='asis'}
+# to include the term ability squared you can create a separate variable or even aesier use the I(function) in the lm command to add the term 
+data(htv, package = "wooldridge")
+reg_htv <- lm(formula = educ ~ motheduc + fatheduc + abil + I(abil^2), data = htv)
+stargazer(reg_htv, dep.var.labels=c("educ"), type = 'html')
+# abil2<-htv$abil^2 this will create the variable separate, but better to use I(abil^2)
+```
+```{r echo = TRUE, results='hold'}
+# Reproduce t statistic
+# When parenthesis are added the object is printed
+# Reproduce p value
+print("T-test for linear vs quadratic relation on ability")
+regtable1 <- summary(reg_htv)$coefficients
+bhat5 <- regtable1[5, 1]
+se5 <- regtable1[5, 2]
+t5 <- (bhat5 - 0)/se5
+(t5_round <- round(t5, 5))
+p5 <-2*pt(t5, df = nrow(htv) - 5, lower.tail = FALSE)
+p5_round <- round(p5, 1)
+print(paste0("pvalue =  ", p5_round))
+
+# Reproduce t statistic
+# When parenthesis are added the object is printed
+ # Is the same as doing bhat / se but it allows you to see where to add the value if different than zero 
+# Reproduce p value
+print("T-test for mother educ > 0.3")
+bhat1 <- regtable1[2, 1]
+se1 <- regtable1[2, 2]
+t1 <- (bhat1 - 0.3)/se1
+(t1_round <- round(t1, 5))
+p1 <-pt(t1, df = nrow(htv) - 5, lower.tail = FALSE)
+p1_round <- round(p1, 6)
+print(paste0("pvalue =  ", p1_round))
+```
+
+<br>
+
+3.  Using the equation in part (2), test $H_0: \beta_1=\beta_2$ against a two-sided alternative. What is the p-value of the test? 
+
+Remember this requires for creating a new regression with a $\theta_1=\beta_1-\beta_2$ as shown in your book and then test for $H_0: \theta_1=0$
+
+ Let's change the regression to create $\theta_1=\beta_1-\beta_2$ 
+
+Add and subrstact $\beta_2 motheduc$ and create a variable $parentedu=motheduc+fatheduc$ see below: 
+
+$$ educ = \beta_0 + \beta_1 motheduc - \beta_2 motheduc + \beta_2 motheduc+ \beta_2 fatheduc + \beta_3 abil + \beta_4 abil^2 + u$$
+
+$$ educ = \beta_0 + (\beta_1 - \beta_2)   motheduc + \beta_2  (motheduc+fatheduc) + \beta_3 abil + \beta_4 abil^2 + u$$
+$$ educ = \beta_0 + \theta_1   motheduc + \beta_2  (parentedu) + \beta_3 abil + \beta_4 abil^2 + u$$
+
+By testing the null hypothesis that $H_0:\theta_1=0$ with $alpha=0.05$ we are testing $H_0: \beta_1=\beta_2$ So we just run the regression that has $\theta_1$ as a regressor and look at the t-test for $\theta_1$
+
+```{r echo = TRUE, results='asis'}
+#critival Values for alpha=5% and 1% for 1225 degrees of freedom 
+print("critical values for alpha 5% and 1% 2 tails")
+alpha_2 <- c(0.025, 0.005)
+qnorm(alpha_2)
+
+# create parenteduc
+htv_par <- htv
+htv_par$parenteduc <- htv_par$motheduc + htv_par$fatheduc
+# regression with theta1
+reg_htv_par <- lm(formula = educ ~ motheduc + parenteduc + abil + I(abil^2), data = htv_par)
+stargazer(reg_htv_par, dep.var.labels=c("educ"), type = 'html')
+regtable2 <- summary(reg_htv_par)$coefficients
+```
+
+***
+**Use in-line code and your interpretation for this paragraph** the value of $\theta_1$ is equal to `r regtable2[2, 1]` with a t-stat of `r regtable2[2, 3]` and a p-value of `r regtable2[2, 4]` this means that we fail to reject the null hypothesis that  $H_0:\theta_1=0$ which means that $\beta_1$ = $\beta_2$ therefore the level of education of mother's and father's are not statistically different in terms of magnitute. 
+
+***
+<br>
+
+4. 	Add the two college tuition variables to the regression from part (2) and determine whether they are jointly statistically significant. 
+First do the F-test step-by-step
+
+```{r echo = TRUE, Ftest}
+# CV for alpha=1% using the F distribution with 1223 degrees of fredom d.f. :
+(f1 <- round(qf(1-0.01, 2, 1223), 6))
+## F test step by step
+# Unrestricted OLS regression:  
+reg_htv2_ur <- lm(formula = educ ~ motheduc + fatheduc + abil + I(abil^2) + tuit17 + tuit18, data = htv)
+# Restricted OLS regression:
+reg_htv2_r <- lm(formula = educ ~ motheduc + fatheduc + abil + I(abil^2), data = htv)
+# R2:
+r2.ur <- summary(reg_htv2_ur)$r.squared # R squared unrestricted
+r2.r <- summary(reg_htv2_r)$r.squared # R squared restricted 
+print(paste("$R^2$ unrestricted=", r2.ur))
+print(paste("$R^2$ restricted=", r2.r))
+# F statistic:
+F <- (r2.ur - r2.r) / (1-r2.ur) * 1223/2
+print(paste("F-stat=", F))
+# p value = 1-cdf of the appropriate F distribution:
+print(paste("p-value=", round(1-pf(F, 2, 1223), 3)))
+```
+<br>
+***
+Then use any of the other methods
+ <br>
+```{r echo = TRUE}
+# F test 
+myH0 <- c("tuit17", "tuit18")
+linearHypothesis(reg_htv2_ur, myH0)
+# anova(res, res.ur)
+anova(reg_htv2_r, reg_htv2_ur)
+```
+
+
+<br> 
+This shows that in this case we **fail to reject the null hypothesis**, that the coefficients are jointly zero. 
+
+***
+5.  Use function `confint()` to find the confidence intervals of all the parameters in the unsrestricted model from (4) What do you conclude? EXPLAIN this results in the light of the significance of your coeficients
+
+- The 95% confidence intervals for motheduc, fatheduc, abil, and abil^2 does not include zero, so they are staticsically significant at 5% significance level. The confidence intervals for tuit17 and tuit18 both overlaps zero, so they are not statistically significant at 5% confidence level.
+
+```{r echo = TRUE}
+confint(reg_htv2_ur, level = 0.95)
+```
+
+6. Using the Breush-Pagan test, test for heteroskedasticity in your  model  
+$$ educ = \beta_0 + \beta_1 *motheduc + \beta_2 *fatheduc + \beta_3 *abil + \beta_4 *abil^2 + u$$ 
+then estimate the model with robust standard errors (correcting for the heteroskedasticy problem), and the present both ( OLS and robust) the results in a table using `screenreg()`. 
+
+Do the significance of your results change after the correction? What about the standard errors?
+
+- The significance does not change after the correction, and all of them are statistically significant at 0.01 significance level. The standard errors increase after the change due to heteroskedasticity.
+
+```{r echo = TRUE}
+reg_bp <- lm(formula = educ ~ motheduc + fatheduc + abil + I(abil^2), data = htv)
+bptest(reg_bp)
+m1 <- lm_robust(educ ~ motheduc + fatheduc + abil + I(abil^2), data = htv, se_type = "classical") %>% extract.lm_robust(include.ci = FALSE)
+m2 <- lm_robust(educ ~ motheduc + fatheduc + abil + I(abil^2), data = htv) %>% extract.lm_robust(include.ci = FALSE)
+screenreg(list(m1, m2), stars = c(0.01, 0.05, 0.1), digits = 3)
+```
+
+
+***
+<style>
+div.gray { background-color:#dbdbdb; border-radius: 5px; padding: 20px;}
+</style>
+<div class = "gray">
+
+**Packages used in this document**
+
+library(estimatr) # for robust estimation
+
+library(wooldridge) # for wooldridge data
+
+library(stargazer) # for tables 
+
+library(texreg) # for tables using lm_robust
+
+library(tidyverse) # for data manipulation
+
+library(lmtest) # for BP test for heterosckedasticity
+
+library(car) # for linear hypothesis test
+
+
+</div>
+<br>
+<br>
+
+
+
+
+
+
+
