@@ -1,0 +1,190 @@
+---
+title: "ECON320 Assignment 5"
+author: "D.Z."
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(ggplot2)
+library(stargazer)
+library(kableExtra)
+library(foreign)
+library(plyr)
+library(estimatr) # for robust estimation
+library(texreg) # for tables using lm_robust
+library(tidyverse) # for data manipulation
+library(lmtest) # for BP test for heterosckedasticity
+library(car) # for linear hypothesis test
+library(MASS)
+```
+
+## Part 1
+
+a. Generate a dataset of 1,000,000 observations from this DGP. Call this the "population data." Then take 1,000 samples (and get the empirical variance of $\hat{\beta_1}$) based on sampling 10, 100, 1,000, 10,000 observations each time.
+
+```{r echo = TRUE}
+set.seed(123)
+
+x <- rnorm(1000000, 10, 10)
+u <- rnorm(1000000, 0, 5)
+y = 2.5 + 1.5 * x + u
+population_data <- data.frame(x, u, y)
+
+beta_1_vector_10 <- c()
+for(i in 1:1000) {
+  newPop_10 <- population_data[sample(nrow(population_data), 10), ]
+  beta_1_10 <- cov(newPop_10$y, newPop_10$x) / var(newPop_10$x)
+  beta_1_vector_10 <- c(beta_1_vector_10, beta_1_10)
+}
+beta_1_10_var <- var(beta_1_vector_10)
+
+beta_1_vector_100 <- c()
+for(i in 1:1000) {
+  newPop_100 <- population_data[sample(nrow(population_data), 100), ]
+  beta_1_100 <- cov(newPop_100$y, newPop_100$x) / var(newPop_100$x)
+  beta_1_vector_100 <- c(beta_1_vector_100, beta_1_100)
+}
+beta_1_100_var <- var(beta_1_vector_100)
+
+beta_1_vector_1000 <- c()
+for(i in 1:1000) {
+  newPop_1000 <- population_data[sample(nrow(population_data), 1000), ]
+  beta_1_1000 <- cov(newPop_1000$y, newPop_1000$x) / var(newPop_1000$x)
+  beta_1_vector_1000 <- c(beta_1_vector_1000, beta_1_1000)
+}
+beta_1_1000_var <- var(beta_1_vector_1000)
+
+beta_1_vector_10000 <- c()
+for(i in 1:1000) {
+  newPop_10000 <- population_data[sample(nrow(population_data), 10000), ]
+  beta_1_10000 <- cov(newPop_10000$y, newPop_10000$x) / var(newPop_10000$x)
+  beta_1_vector_10000 <- c(beta_1_vector_10000, beta_1_10000)
+}
+beta_1_10000_var <- var(beta_1_vector_10000)
+```
+
+b. Plot the 4 Histograms (or density plots) that result from these simulations. Either place all 4 histograms on the same plot, or make the x-axis on all 4 the same range.
+
+```{r echo = TRUE}
+name10 <- c("beta_1_10")
+df10 <- cbind(name10, beta_1_vector_10)
+name100 <- c("beta_1_100")
+df100 <- cbind(name100, beta_1_vector_100)
+name1000 <- c("beta_1_1000")
+df1000 <- cbind(name1000, beta_1_vector_1000)
+name10000 <- c("beta_1_10000")
+df10000 <- cbind(name10000, beta_1_vector_10000)
+colnames(df10) <- c("bname", "bvalue")
+colnames(df100) <- c("bname", "bvalue")
+colnames(df1000) <- c("bname", "bvalue")
+colnames(df10000) <- c("bname", "bvalue")
+df_beta_1 <- rbind(df10, df100, df1000, df10000)
+
+frame_beta_1 <- data.frame(df_beta_1)
+frame_beta_1$bvalue <- as.numeric(as.character(frame_beta_1$bvalue))
+mu <- ddply(frame_beta_1, "bname", summarise, grp.mean=mean(bvalue))
+head(mu)
+ggplot(frame_beta_1, aes(x=bvalue, color=bname)) +
+  geom_density()+
+  geom_vline(data=mu, aes(xintercept=grp.mean, color=bname),
+             linetype="dashed")
+```
+
+c. Make another plot, which on the x-axis has the sample size you were using, and on the y-axis you have the empirical variance across the 1,000 draws
+
+```{r echo = TRUE}
+size <- c(10, 100, 1000, 10000)
+emp_var <- c(beta_1_10_var, beta_1_100_var, beta_1_1000_var, beta_1_10000_var)
+df_var <- data.frame(size, emp_var)
+ggplot(df_var, aes(x = size, y = emp_var)) + geom_point() + geom_line()
+```
+
+## Part 2
+
+a. Show visually that the data appear heteroskedastic when using U', but not when using U in the DGP 
+
+```{r echo = TRUE}
+x1 <- rnorm(100000, 10, 10)
+u1 <- rnorm(100000, 0, 5)
+y1 = 2.5 + 1.5 * x1 + u1
+situation_1 <- data.frame(x1, u1, y1)
+beta_1_vector1 <- c()
+for(i in 1:1000) {
+  newPop1 <- situation_1[sample(nrow(situation_1), 1000), ]
+  beta_1_1 <- cov(newPop1$y1, newPop1$x1) / var(newPop1$x1)
+  beta_1_vector1 <- c(beta_1_vector1, beta_1_1)
+}
+
+ana_var1 <- var(u) / (var(x1) * 999)
+emp_var1 <- var(beta_1_vector1)
+
+x2 <- rnorm(100000, 10, 10)
+u2 <- rnorm(100000, 0, 5)
+u_cond <- u2*x2
+y2 = 2.5 + 1.5 * x2 + u_cond
+situation_2 <- data.frame(x2, u_cond, y2)
+beta_1_vector2 <- c()
+for(i in 1:1000) {
+  newPop2 <- situation_2[sample(nrow(situation_2), 1000), ]
+  beta_1_2 <- cov(newPop2$y2, newPop2$x2) / var(newPop2$x2)
+  beta_1_vector2 <- c(beta_1_vector2, beta_1_2)
+}
+
+ana_var2 <- var(u_cond) / (var(x2) * 999)
+emp_var2 <- var(beta_1_vector2)
+
+reg_u <- lm(formula = y1 ~ x1, data = situation_1)
+reg_ux <- lm(formula = y2 ~ x2, data = situation_2)
+
+ggplot(data = situation_1, aes(x = x1, y = y1)) +
+  geom_point(color = "red") +
+  stat_function(fun = function(x){coef(reg_u)[1] + coef(reg_u)[2] * x}, geom = "line", color = "blue") +
+  ggtitle("Using U")
+
+ggplot(data = situation_2, aes(x = x2, y = y2)) +
+  geom_point(color = "red") +
+  stat_function(fun = function(x){coef(reg_ux)[1] + coef(reg_ux)[2] * x}, geom = "line", color = "blue") +
+  ggtitle("Using U'")
+```
+
+b. Perform a Breusch-Pagan test of heteroskedasticity when using U' and then when using U in the DGP. What does the test statistic yield in each case, and what do you conclude?
+
+```{r echo = TRUE}
+bptest(reg_u)
+bptest(reg_ux)
+```
+
+- As the result shows, p-values in reg_u is relatively large (0.05), thus we fail to reject H0, and we can conclude that model reg_u comply with homoskedasticity. For model reg_ux, the p-value is extreamely small, thus we reject H0, and heteroskedasticity is present in model reg_ux.
+
+c. Estimate the model using heteroskedasticity-robust standard errors for each DGP. What is the variance of $\hat{\beta_1}$, and how does this compare to the empirical and analytical variance you found in #5 of PS4(in Part II)
+
+```{r echo = TRUE}
+reg_u_robust <- rlm(y1 ~ x1, data = situation_1)
+reg_ux_robust <- rlm(y2 ~ x2, data = situation_2)
+
+beta1_var_reg_u <- (summary(reg_u)$coefficients[2, 2])^2
+beta1_var_reg_u_robust <- (summary(reg_u_robust)$coefficients[2, 2])^2
+beta1_var_reg_ux <- (summary(reg_ux)$coefficients[2, 2])^2
+beta1_var_reg_ux_robust <- (summary(reg_ux_robust)$coefficients[2, 2])^2
+beta1_vars <- data.frame(beta1_var_reg_u, beta1_var_reg_u_robust, beta1_var_reg_ux, beta1_var_reg_ux_robust)
+prop.table(beta1_vars)
+```
+
+Compared to the empirical and analytical variance of that in PS4 (OLS), the variance of $\hat{\beta_1}$ in U robust is relatively larger than that from OLS. The variance of $\hat{\beta_1}$ in U' robust is smaller than that from OLS.
+
+## Part 3
+
+a. Choose one of these methods, and relate your understanding of it in conceptual and straightforward terms (3-6 sentences).
+
+-  We can use proxy variables to solve this problem. Conceptually speaking, the proxy variable $x_3(star)$, is generated with the manner of $x_3(star) = \delta_0 + \delta_3 x_3 + v_3$, which $v_3$ is the error due to the fact that $x_3(star)$ and $x_3$ are not exactly related. In a rhetoric manner, the proxy variable is a variable that plays the role of an ommitted variable in the model, so that we can partially compensate for the effect of omitted variables. 
+
+b. Come up with a situation that you might like to analyze and for which a causal effect would be interesting to know. This would generally take the form of "I would like to know the true effect of [policy X] on outcome [Y]". Do not use example from the book, nor the assignments, nor any prominent economics study covered in the popular press. What would be the quantity / estimate you would want to recover, and what would be the problem with going out into the world and collecting observational data on the situation and variables you would need?
+
+- I would like to study the true effect of temporary tax cut on people's consuming behavior. I believe that people within different age group and different socio-economics background will behave differently. I believe people that are younger would react to temoprary tax cut less evidently than middle-aged, due to their early stage of financial acquisition, by not increase their spending as much comparatively. The major difficulty in terms of data collection would be the representation for each age group in our dataset. People of all ages are not evenly distributed, therefore smaller group would have significantly less sample than that of larger group.
+
+c. Propose a situation in which one of the methods we discussed could be used to obtain unbiased estimates of the coefficient you would be interested in? (Note that an answer of uses the trail method can, at maximum, get 3/4 the of credit for this subpart of the question.) What feature of the situation would need to exist for you to undertake the analysis?
+
+- In this case, if we have a proxy variable is not available, or our data does not have the properties needed to produce a consistent $\hat{\beta_1}$, we can introduce instrumental variables z. Variable z has to be indogenuous in $y = \beta_0 + \beta_1 x + u$ in order for us to use it. 
